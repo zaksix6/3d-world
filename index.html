@@ -4,19 +4,15 @@
     <meta charset="utf-8">
     <title>My Free 3D Multi-User World</title>
     
-    <!-- 1. Core 3D Graphics Engine -->
-    <script src="https://aframe.io"></script>
+    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
     
-    <!-- 2. Underlying Multi-User Sync Framework -->
-    <script src="https://unpkg.com"></script>
+    <script src="https://unpkg.com/networked-aframe@^0.12.0/dist/networked-aframe.min.js"></script>
     
-    <!-- 3. Dedicated Socket & EasyRTC Network Adapters -->
-    <script src="https://cloudflare.com"></script>
-    <script src="https://unpkg.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="https://unpkg.com/easyrtc@2.0.0/api/easyrtc.js"></script>
   </head>
   <body>
 
-    <!-- Updated setup: Changed adapter to 'easyrtc' and added secure ws protocol fallback -->
     <a-scene networked-scene="
       room: lobby;
       debug: true;
@@ -24,27 +20,25 @@
       serverURL: https://signaling-server-b0ds.onrender.com;
     ">
       
-      <!-- Assets & Player Avatars Template -->
       <a-assets>
         <template id="avatar-template">
-          
+          <a-entity class="avatar">
             <a-sphere class="head" color="#5F9EA0" radius="0.4">
               <a-sphere class="eye" color="#FFF" radius="0.1" position="0.15 0.1 -0.35"></a-sphere>
               <a-sphere class="eye" color="#FFF" radius="0.1" position="-0.15 0.1 -0.35"></a-sphere>
             </a-sphere>
-          
+          </a-entity>
         </template>
       </a-assets>
 
-      <!-- 3D Environment World Layout -->
       <a-sky color="#ECEFF1"></a-sky>
       <a-plane position="0 0 0" rotation="-90 0 0" width="30" height="30" color="#7BC8A4"></a-plane>
       <a-box position="0 1 -5" rotation="0 45 0" color="#4CC3D9"></a-box>
 
-      <!-- Player Instance -->
+      <a-entity id="rig" movement-controls position="0 0 0">
+        <a-entity camera position="0 1.6 0" look-controls></a-entity>
+      </a-entity>
       
-      
-
     </a-scene>
 
   </body>
