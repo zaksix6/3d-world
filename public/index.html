@@ -1,0 +1,1478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Virtual World</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        #loginPanel {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 30px;
+            border-radius: 10px;
+            pointer-events: all;
+            color: white;
+            text-align: center;
+            z-index: 1000;
+            border: 2px solid #4CAF50;
+        }
+
+        #loginPanel input, #loginPanel select {
+            padding: 10px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            width: 200px;
+        }
+
+        #loginPanel button {
+            padding: 10px 20px;
+            margin: 10px;
+            border: none;
+            border-radius: 5px;
+            background: #4CAF50;
+            color: white;
+            cursor: pointer;
+        }
+
+        /* --- Chat Panel Styles --- */
+        #chatPanel {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            width: 300px;
+            height: 60px;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 10px;
+            padding: 10px;
+            pointer-events: all;
+            display: none;
+            flex-direction: column;
+            justify-content: flex-end;
+            z-index: 100;
+            border: 1px solid #333;
+            transition: height 0.3s ease-in-out, width 0.3s ease-in-out;
+        }
+        
+        #chatPanel.chat-collapsed {
+            height: 60px;
+        }
+        
+        #chatPanel.chat-minimal {
+            height: 163px;
+            width: 300px;
+        }
+        
+        #chatPanel.chat-expanded {
+            height: 282px;
+        }
+        
+        #chatHeader {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        #chatHeader h3 {
+            margin: 0;
+        }
+        
+        #chatToggle {
+            padding: 5px 10px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        #chatMessages {
+            overflow-y: auto;
+            color: white;
+            font-size: 12px;
+            border: 1px solid #333;
+            padding: 5px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            flex-grow: 1;
+            display: none;
+        }
+        
+        #chatMessages p {
+            margin: 0;
+            line-height: 1.4;
+        }
+        
+        #chatPanel.chat-expanded #chatMessages,
+        #chatPanel.chat-minimal #chatMessages {
+            display: block;
+        }
+        
+        #chatPanel.chat-minimal #chatMessages {
+            height: 73px;
+            flex-grow: 0;
+        }
+        
+        #chatInputContainer {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            width: 300px;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 10px;
+            padding: 10px;
+            pointer-events: all;
+            display: none;
+            flex-direction: column;
+            gap: 5px;
+            z-index: 100;
+        }
+        
+        #chatInput {
+            width: 100%;
+            padding: 5px;
+            border: none;
+            border-radius: 3px;
+            box-sizing: border-box;
+        }
+        
+        #sendButton {
+            width: 100%;
+            padding: 8px 10px;
+            border: none;
+            border-radius: 3px;
+            background: #4CAF50;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        /* --- D-Pad Styles --- */
+        #dpad {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: none;
+            pointer-events: all;
+            z-index: 100;
+            grid-template-areas: 
+                ". up ."
+                "left . right"
+                ". down .";
+            grid-template-columns: 60px 60px 60px;
+            grid-template-rows: 60px 60px 60px;
+            gap: 5px;
+            opacity: 0.7;
+        }
+        
+        .dpad-button {
+            background-color: rgba(50, 50, 50, 0.8);
+            color: white;
+            border: 2px solid rgba(100, 100, 100, 0.8);
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5em;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        
+        #dpad-up { grid-area: up; }
+        #dpad-left { grid-area: left; }
+        #dpad-right { grid-area: right; }
+        #dpad-down { grid-area: down; }
+        
+        .dpad-button:active {
+            background-color: rgba(100, 100, 100, 0.9);
+            border-color: rgba(150, 150, 150, 0.9);
+        }
+
+        /* --- UI Styles (General) --- */
+        #playerList {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 5px;
+            pointer-events: none;
+            display: none;
+            z-index: 100;
+            border-radius: 5px;
+        }
+
+        #playerList h3 {
+            margin: 0;
+            font-size: 1em;
+        }
+
+        #playerList #playerNames {
+            margin-top: 3px;
+        }
+
+        #billboardUploadPanel {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            pointer-events: all;
+            color: white;
+            text-align: center;
+            z-index: 1000;
+            display: none;
+            border: 2px solid #4CAF50;
+        }
+
+        #billboardUploadPanel h3 {
+            margin-top: 0;
+        }
+
+        #billboardUploadPanel input[type="file"] {
+            margin: 10px 0;
+        }
+
+        #billboardUploadPanel button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            background: #4CAF50;
+            color: white;
+            cursor: pointer;
+        }
+
+        #loadingMessage {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            color: white;
+            text-align: center;
+            z-index: 1001;
+            display: none;
+            border: 2px solid #4CAF50;
+        }
+
+        #loadingMessage .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #333;
+            border-top: 4px solid #4CAF50;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 10px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* --- Mobile Responsive Styles --- */
+        @media (max-width: 768px) and (orientation: portrait) {
+            #chatPanel {
+                width: 20vw;
+                left: 5px;
+                bottom: 120px;
+                right: auto;
+                padding: 5px;
+                box-sizing: border-box;
+                background-color: black;
+            }
+            #chatPanel.chat-expanded {
+                height: 55vh;
+            }
+            #chatPanel.chat-minimal {
+                width: 20vw;
+                height: 30vh;
+                left: 5px;
+                right: auto;
+                padding: 5px;
+            }
+            #chatPanel.chat-minimal #chatMessages {
+                height: calc(30vh - 90px);
+            }
+            #chatInputContainer {
+                width: 40vw;
+                left: 5px;
+                bottom: 10px;
+            }
+            #dpad {
+                right: 5px;
+                bottom: 5px;
+                transform: scale(0.8);
+                transform-origin: bottom right;
+            }
+        }
+        
+        @media (max-width: 768px) and (orientation: landscape) {
+            #chatPanel {
+                width: 20vw;
+                left: 5px;
+                bottom: 110px;
+                right: auto;
+                padding: 3px;
+            }
+            #chatPanel.chat-expanded {
+                height: 65vh;
+            }
+            #chatPanel.chat-minimal {
+                width: 20vw;
+                height: 45vh;
+                left: 5px;
+                right: auto;
+            }
+            #chatPanel.chat-minimal #chatMessages {
+                height: calc(45vh - 90px);
+            }
+            #chatInputContainer {
+                width: 20vw;
+                left: 5px;
+                bottom: 10px;
+            }
+            #dpad {
+                right: 5px;
+                bottom: 5px;
+                transform: scale(0.8);
+                transform-origin: bottom right;
+            }
+        }
+    </style>
+</head>
+
+//p2
+
+<body>
+    <div id="gameContainer">
+        </div>
+
+    <div id="ui">
+        <div id="loginPanel">
+            <h2>3D Chat World</h2>
+            <input type="text" id="usernameInput" placeholder="Enter username">
+            <select id="avatarSelect">
+                <option value="selena2">Gomez</option>
+                <option value="astronaut">Astro</option>
+                <option value="martin2">Shorty</option>
+                <option value="cub">King</option>
+            </select>
+            <button id="joinButton">Join World</button>
+        </div>
+
+        <div id="loadingMessage">
+            <div class="spinner"></div>
+            <p>Loading...</p>
+        </div>
+
+        <div id="playerList" style="display: none;">
+            <h3>Players Online (<span id="playerCount">0</span>)</h3>
+            <div id="playerNames"></div>
+        </div>
+
+        <div id="billboardUploadPanel" style="display: none;">
+            <h3 id="billboardTitle">Upload Image</h3>
+            <input type="file" id="imageFile" accept="image/*">
+            <button id="uploadButton">Upload</button>
+            <button id="cancelUpload">Cancel</button>
+        </div>
+
+        <div id="chatPanel" class="chat-collapsed">
+            <div id="chatHeader">
+                <button id="chatToggle">Toggle Chat (Closed)</button>
+            </div>
+            <div id="chatMessages"></div>
+        </div>
+        
+        <div id="chatInputContainer" style="display: none;">
+            <input type="text" id="chatInput" placeholder="Type a message...">
+            <button id="sendButton">Send</button>
+        </div>
+
+        <div id="dpad">
+            <div class="dpad-button" id="dpad-up">&#9650;</div>
+            <div class="dpad-button" id="dpad-left">&#9664;</div>
+            <div class="dpad-button" id="dpad-right">&#9654;</div>
+            <div class="dpad-button" id="dpad-down">&#9660;</div>
+        </div>
+
+    </div>
+
+    <script>
+        // Global variables
+        let scene, camera, renderer, socket;
+        let avatars = {};
+        let myAvatar = null;
+        let myUserId = null;
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+        let velocity = new THREE.Vector3();
+        let billboardMeshes = {};
+        let raycaster = new THREE.Raycaster();
+        let mouse = new THREE.Vector2();
+        let currentBillboardId = null;
+        let isTyping = false;
+        let selectedAvatar = 'selena2'; 
+        let username = '';
+        let gltfLoader = null;
+        let avatarMixers = {};
+        let clock = new THREE.Clock();
+        let loadedGLBModels = {}; // Cache for loaded GLB models
+
+        // Touch rotation variables
+        let isTouchRotating = false;
+        let touchX = 0;
+
+        // Avatar positioning and scaling configurations
+        const avatarConfigs = {
+            'selena2': { 
+                scale: 1.0, 
+                yOffset: 1.2, 
+                rotationOffset: Math.PI 
+            },
+            'astronaut': { 
+                scale: 1.0, 
+                yOffset: 1.0, 
+                rotationOffset: Math.PI/2
+            },
+            'martin2': { 
+                scale: 1.0, 
+                yOffset: 1.2, 
+                rotationOffset: Math.PI 
+            },
+            'cub': { 
+                scale: 1.0, 
+                yOffset: 1, 
+                rotationOffset: Math.PI 
+            }
+        };
+
+        // Initialize GLTFLoader after scripts load
+        function initGLTFLoader() {
+            if (typeof THREE.GLTFLoader !== 'undefined') {
+                gltfLoader = new THREE.GLTFLoader();
+                console.log('GLTFLoader initialized successfully');
+            } else {
+                console.warn('GLTFLoader not available, some features will be disabled.');
+                gltfLoader = null;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const usernameInput = document.getElementById('usernameInput');
+            const avatarSelect = document.getElementById('avatarSelect');
+            const joinButton = document.getElementById('joinButton');
+
+            // Set the default selection for the dropdown
+            avatarSelect.value = selectedAvatar;
+
+            usernameInput.addEventListener('input', () => {
+                joinButton.disabled = usernameInput.value.trim() === '';
+            });
+
+            joinButton.addEventListener('click', () => {
+                username = usernameInput.value.trim();
+                selectedAvatar = avatarSelect.value;
+                if (username) {
+                    document.getElementById('loginPanel').style.display = 'none';
+                    document.getElementById('loadingMessage').style.display = 'block';
+                    setTimeout(initializeWorld, 500);
+                }
+            });
+
+            usernameInput.focus();
+        });
+
+        function initializeWorld() {
+            initGLTFLoader();
+            if (typeof io !== 'undefined') {
+                socket = io();
+                initScene();
+                setupSocketHandlers();
+            } else {
+                alert('Socket.io not loaded. Please check your network connection.');
+            }
+        }
+
+        function initScene() {
+            scene = new THREE.Scene();
+            scene.fog = new THREE.Fog(0x87CEEB, 50, 200);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 7, 10);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setClearColor(0x87CEEB);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.getElementById('gameContainer').appendChild(renderer.domElement);
+
+                // Add permanent objects to the scene with individual scaling
+    // The fourth parameter is a new THREE.Vector3(x, y, z) for the scale.
+    // A value of 1 means original size. 2 means twice as big. 0.5 means half size.
+            loadPermanentObject('objects/pond.glb', new THREE.Vector3(25, .1, -30), null, new THREE.Vector3(10, 10, 10));
+            loadPermanentObject('objects/gazebo.glb', new THREE.Vector3(-25, -.7, 30), new THREE.Vector3(0, Math.PI / 4, 0), new THREE.Vector3(3.5, 3.5, 3.5));
+            
+            loadSkybox();
+            createLighting();
+            createGround();
+            createTrees();
+            createBillboards();
+            createMyAvatar();
+            setupControls();
+            
+            // Show UI elements
+            document.getElementById('loadingMessage').style.display = 'none';
+            document.getElementById('ui').style.display = 'block';
+            document.getElementById('playerList').style.display = 'block';
+            document.getElementById('chatPanel').style.display = 'flex';
+            
+            // Show D-Pad on small screens
+            if (window.innerWidth <= 768) {
+                document.getElementById('dpad').style.display = 'grid';
+            }
+
+            animate();
+        }
+
+        function createLighting() {
+            const ambientLight = new THREE.AmbientLight(0x404040, 1.8);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(50, 50, 50);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            scene.add(directionalLight);
+
+            const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight2.position.set(50, 50, -50);
+            directionalLight2.castShadow = false;
+            directionalLight2.shadow.mapSize.width = 2048;
+            directionalLight2.shadow.mapSize.height = 2048;
+            scene.add(directionalLight2);
+        }
+
+        function loadSkybox() {
+            const skyboxImages = [
+                'textures/skybox/px.jpg', 'textures/skybox/nx.jpg',
+                'textures/skybox/py.jpg', 'textures/skybox/ny.jpg',
+                'textures/skybox/pz.jpg', 'textures/skybox/nz.jpg'
+            ];
+            const loader = new THREE.CubeTextureLoader();
+            loader.load(skyboxImages, texture => {
+                scene.background = texture;
+            }, undefined, error => {
+                console.warn('Skybox could not be loaded, using default sky:', error);
+            });
+        }
+        
+        function createGround() {
+            const groundGeometry = new THREE.PlaneGeometry(100, 100);
+            const textureLoader = new THREE.TextureLoader();
+            textureLoader.load(
+                'textures/ground_texture.jpg',
+                (texture) => {
+                    texture.wrapS = THREE.RepeatWrapping;
+                    texture.wrapT = THREE.RepeatWrapping;
+                    texture.repeat.set(10, 10);
+                    const groundMaterial = new THREE.MeshLambertMaterial({ map: texture });
+                    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+                    ground.rotation.x = -Math.PI / 2;
+                    ground.receiveShadow = true;
+                    scene.add(ground);
+                },
+                undefined,
+                (error) => {
+                    console.warn('Ground texture could not be loaded, using default color:', error);
+                    const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x3d8b37 });
+                    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+                    ground.rotation.x = -Math.PI / 2;
+                    ground.receiveShadow = true;
+                    scene.add(ground);
+                }
+            );
+        }
+
+        function createTrees() {
+            for (let i = 0; i < 15; i++) {
+                const tree = new THREE.Group();
+                
+                // Randomly choose tree type
+                const treeType = Math.random() > 0.5 ? 'oak' : 'pine';
+                
+                if (treeType === 'oak') {
+                    // Oak tree - round leaves, thick trunk
+                    const trunkGeometry = new THREE.CylinderGeometry(0.4, 0.6, 4);
+                    const trunkMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+                    const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+                    trunk.position.y = 2;
+                    trunk.castShadow = true;
+                    tree.add(trunk);
+                    
+                    // Multiple spherical leaf clusters for oak
+                    const leafColors = [0x228B22, 0x32CD32, 0x006400];
+                    const leafColor = leafColors[Math.floor(Math.random() * leafColors.length)];
+                    
+                    // Main leaf cluster
+                    const leavesGeometry1 = new THREE.SphereGeometry(2.5);
+                    const leavesMaterial1 = new THREE.MeshLambertMaterial({ color: leafColor });
+                    const leaves1 = new THREE.Mesh(leavesGeometry1, leavesMaterial1);
+                    leaves1.position.y = 5.5;
+                    leaves1.castShadow = true;
+                    tree.add(leaves1);
+                    
+                    // Additional leaf clusters for fuller look
+                    const leavesGeometry2 = new THREE.SphereGeometry(1.8);
+                    const leavesMaterial2 = new THREE.MeshLambertMaterial({ color: leafColor });
+                    const leaves2 = new THREE.Mesh(leavesGeometry2, leavesMaterial2);
+                    leaves2.position.set(-1.2, 4.8, 0.8);
+                    leaves2.castShadow = true;
+                    tree.add(leaves2);
+                    
+                    const leaves3 = new THREE.Mesh(leavesGeometry2, leavesMaterial2);
+                    leaves3.position.set(1.5, 5.2, -0.5);
+                    leaves3.castShadow = true;
+                    tree.add(leaves3);
+                    
+                } else {
+                    // Pine tree - conical shape, thinner trunk
+                    const trunkGeometry = new THREE.CylinderGeometry(0.25, 0.4, 5);
+                    const trunkMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+                    const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+                    trunk.position.y = 2.5;
+                    trunk.castShadow = true;
+                    tree.add(trunk);
+                    
+                    // Layered conical sections for pine tree
+                    const pineColors = [0x228B22, 0x006400, 0x2F4F2F];
+                    const pineColor = pineColors[Math.floor(Math.random() * pineColors.length)];
+                    
+                    // Bottom layer
+                    const coneGeometry1 = new THREE.ConeGeometry(2.2, 3);
+                    const coneMaterial1 = new THREE.MeshLambertMaterial({ color: pineColor });
+                    const cone1 = new THREE.Mesh(coneGeometry1, coneMaterial1);
+                    cone1.position.y = 5.5;
+                    cone1.castShadow = true;
+                    tree.add(cone1);
+                    
+                    // Middle layer
+                    const coneGeometry2 = new THREE.ConeGeometry(1.8, 2.5);
+                    const coneMaterial2 = new THREE.MeshLambertMaterial({ color: pineColor });
+                    const cone2 = new THREE.Mesh(coneGeometry2, coneMaterial2);
+                    cone2.position.y = 6.8;
+                    cone2.castShadow = true;
+                    tree.add(cone2);
+                    
+                    // Top layer
+                    const coneGeometry3 = new THREE.ConeGeometry(1.3, 2);
+                    const coneMaterial3 = new THREE.MeshLambertMaterial({ color: pineColor });
+                    const cone3 = new THREE.Mesh(coneGeometry3, coneMaterial3);
+                    cone3.position.y = 8;
+                    cone3.castShadow = true;
+                    tree.add(cone3);
+                }
+                
+                // Random position (avoid center area)
+                let x, z;
+                do {
+                    x = (Math.random() - 0.5) * 80;
+                    z = (Math.random() - 0.5) * 80;
+                } while (
+                    (Math.abs(x) < 15 && Math.abs(z) < 15) || 
+                    (Math.abs(x + 25) < 10 && Math.abs(z - 30) < 10) ||
+                    (Math.abs(x - 25) < 10 && Math.abs(z + 30) < 10) ||
+                    (Math.abs(x + 15) < 7 && Math.abs(z) < 7) ||
+                    (Math.abs(x - 15) < 7 && Math.abs(z) < 7)
+                );
+                
+                tree.position.set(x, 0, z);
+                tree.rotation.y = Math.random() * Math.PI * 2;
+                scene.add(tree);
+            }
+        }
+        
+        function createBillboards() {
+    // First billboard plane (faces one direction)
+    const billboard1Geometry = new THREE.PlaneGeometry(8, 6);
+    const billboard1Material = new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.FrontSide });
+    const billboard1 = new THREE.Mesh(billboard1Geometry, billboard1Material);
+    billboard1.position.set(-15, 5, -0.1); // Slightly offset
+    billboard1.rotation.y = 0; 
+    billboard1.castShadow = true;
+    billboard1.userData = { billboardId: '1' };
+    billboardMeshes['1'] = billboard1;
+    scene.add(billboard1);
+    
+    // Second billboard plane (faces opposite direction)
+    const billboard2Geometry = new THREE.PlaneGeometry(8, 6);
+    const billboard2Material = new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.FrontSide });
+    const billboard2 = new THREE.Mesh(billboard2Geometry, billboard2Material);
+    billboard2.position.set(-15, 5, 0.1); // Slightly offset in opposite direction
+    billboard2.rotation.y = Math.PI; 
+    billboard2.castShadow = true;
+    billboard2.userData = { billboardId: '2' };
+    billboardMeshes['2'] = billboard2;
+    scene.add(billboard2);
+
+    // Repeat for the second pair
+    const billboard3Geometry = new THREE.PlaneGeometry(8, 6);
+    const billboard3Material = new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.FrontSide });
+    const billboard3 = new THREE.Mesh(billboard3Geometry, billboard3Material);
+    billboard3.position.set(15, 5, -0.1);
+    billboard3.rotation.y = 0; 
+    billboard3.castShadow = true;
+    billboard3.userData = { billboardId: '3' };
+    billboardMeshes['3'] = billboard3;
+    scene.add(billboard3);
+
+    const billboard4Geometry = new THREE.PlaneGeometry(8, 6);
+    const billboard4Material = new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.FrontSide });
+    const billboard4 = new THREE.Mesh(billboard4Geometry, billboard4Material);
+    billboard4.position.set(15, 5, 0.1);
+    billboard4.rotation.y = Math.PI;
+    billboard4.castShadow = true;
+    billboard4.userData = { billboardId: '4' };
+    billboardMeshes['4'] = billboard4;
+    scene.add(billboard4);
+}
+
+        // New function to load permanent GLB objects
+        function loadPermanentObject(objectPath, position, rotation, scale) {
+            if (!gltfLoader) {
+                console.warn('GLTFLoader not available, cannot load object:', objectPath);
+                return;
+            }
+            gltfLoader.load(
+                objectPath,
+                (gltf) => {
+                    const object = gltf.scene;
+                    object.position.copy(position);
+                    if (rotation) {
+                        object.rotation.set(rotation.x, rotation.y, rotation.z);
+                    }
+                    if (scale) {
+                        object.scale.copy(scale);
+                    }
+                    object.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                        }
+                    });
+                    scene.add(object);
+                    console.log('Object loaded successfully:', objectPath);
+                },
+                undefined,
+                (error) => {
+                    console.error('Failed to load object:', objectPath, error);
+                }
+            );
+        }
+
+        function loadGLBAvatar(avatarType, callback) {
+            if (!gltfLoader) {
+                console.warn('GLTFLoader not available.');
+                callback(null);
+                return;
+            }
+            
+            if (!avatarType || !avatarConfigs[avatarType]) {
+                console.error(`Invalid or missing avatar type: ${avatarType}`);
+                callback(null);
+                return;
+            }
+
+            const config = avatarConfigs[avatarType];
+
+            // Check if we already have this model cached
+            if (loadedGLBModels[avatarType]) {
+                console.log(`Using cached model for ${avatarType}`);
+                const cachedModel = loadedGLBModels[avatarType];
+                const clonedAvatar = cachedModel.scene.clone();
+                
+                // Apply configuration
+                applyAvatarConfiguration(clonedAvatar, config);
+                
+                // Clone animations if they exist
+                let mixer = null;
+                if (cachedModel.animations && cachedModel.animations.length > 0) {
+                    mixer = new THREE.AnimationMixer(clonedAvatar);
+                    const idleAnimation = cachedModel.animations.find(anim =>
+                        anim.name.toLowerCase().includes('idle') ||
+                        anim.name.toLowerCase().includes('stand')
+                    );
+                    if (idleAnimation) {
+                        const action = mixer.clipAction(idleAnimation);
+                        action.play();
+                    }
+                }
+                
+                callback({ avatar: clonedAvatar, mixer: mixer, avatarType: avatarType });
+                return;
+            }
+
+            // Load the model for the first time
+            const avatarPath = `avatars/${avatarType}.glb`;
+            console.log(`Loading GLB avatar: ${avatarPath}`);
+            
+            gltfLoader.load(
+                avatarPath,
+                (gltf) => {
+                    console.log(`Successfully loaded GLB avatar: ${avatarType}`);
+                    
+                    // Cache the original model
+                    loadedGLBModels[avatarType] = gltf;
+                    
+                    const avatar = gltf.scene.clone();
+                    
+                    // Apply configuration
+                    applyAvatarConfiguration(avatar, config);
+                    
+                    let mixer = null;
+                    if (gltf.animations && gltf.animations.length > 0) {
+                        mixer = new THREE.AnimationMixer(avatar);
+                        const idleAnimation = gltf.animations.find(anim =>
+                            anim.name.toLowerCase().includes('idle') ||
+                            anim.name.toLowerCase().includes('stand')
+                        );
+                        if (idleAnimation) {
+                            const action = mixer.clipAction(idleAnimation);
+                            action.play();
+                        }
+                    }
+                    callback({ avatar: avatar, mixer: mixer, avatarType: avatarType });
+                },
+                undefined,
+                (error) => {
+                    console.warn(`Failed to load GLB avatar ${avatarType}:`, error);
+                    callback(null);
+                }
+            );
+        }
+
+        // Function to apply avatar configuration (scaling, positioning, rotation)
+        function applyAvatarConfiguration(avatar, config) {
+            // Calculate scale based on avatar size
+            const box = new THREE.Box3().setFromObject(avatar);
+            const size = box.getSize(new THREE.Vector3());
+            const maxSize = Math.max(size.x, size.y, size.z);
+            const targetHeight = 2.5;
+            const scale = (targetHeight / maxSize) * config.scale;
+            avatar.scale.set(scale, scale, scale);
+            
+            // Center the avatar and apply Y offset
+            box.setFromObject(avatar);
+            const center = box.getCenter(new THREE.Vector3());
+            avatar.position.sub(center);
+            avatar.position.y += config.yOffset;
+            
+            // Apply rotation offset
+            avatar.rotation.y = config.rotationOffset;
+            
+            // Set up shadows
+            avatar.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                }
+            });
+        }
+
+        function createMyAvatar() {
+            loadGLBAvatar(selectedAvatar, (result) => {
+                if (result && result.avatar) {
+                    myAvatar = new THREE.Group();
+                    myAvatar.add(result.avatar);
+                    if (result.mixer) {
+                        avatarMixers[myUserId] = result.mixer;
+                    }
+                    selectedAvatar = result.avatarType; 
+                    // Update my avatar type on the server
+                    socket.emit('my-avatar-updated', { avatarType: selectedAvatar });
+                } else {
+                    // Handle failure to load my own avatar
+                    console.error("Could not load my own avatar, stopping execution.");
+                    return;
+                }
+                myAvatar.position.set(0, 0, 0);
+                scene.add(myAvatar);
+                updateCameraPosition();
+            });
+        }
+        
+        function createAvatar(userData) {
+            return new Promise(resolve => {
+                const avatarTypeToLoad = userData.avatarType;
+                console.log(`Creating avatar for user: ${userData.username}, type: ${avatarTypeToLoad}`);
+                
+                // Load the GLB avatar asynchronously
+                loadGLBAvatar(avatarTypeToLoad, (result) => {
+                    if (!result || !result.avatar) {
+                        console.warn(`Skipping avatar creation for ${userData.username} due to loading failure.`);
+                        resolve(null);
+                        return;
+                    }
+
+                    const avatarGroup = new THREE.Group();
+                    avatarGroup.userData.userId = userData.id;
+                    avatarGroup.userData.username = userData.username;
+                    avatarGroup.userData.avatarType = result.avatarType;
+                    
+                    // Create the username label
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    canvas.width = 256;
+                    canvas.height = 64;
+                    context.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    context.fillRect(0, 0, 256, 64);
+                    context.fillStyle = 'white';
+                    context.font = '24px Arial';
+                    context.textAlign = 'center';
+                    context.fillText(userData.username, 128, 40);
+                    const texture = new THREE.CanvasTexture(canvas);
+                    const labelMaterial = new THREE.SpriteMaterial({ map: texture });
+                    const label = new THREE.Sprite(labelMaterial);
+                    label.position.y = 3.5;
+                    label.scale.set(2, 0.5, 1);
+                    label.userData.isLabel = true;
+                    avatarGroup.add(label);
+                    
+                    // Add the loaded GLB mesh to the group
+                    const avatarMesh = result.avatar;
+                    avatarMesh.userData.isAvatarMesh = true;
+                    avatarGroup.add(avatarMesh);
+                    
+                    if (result.mixer) {
+                        avatarMixers[userData.id] = result.mixer;
+                    }
+                    
+                    // Set the initial position and rotation
+                    avatarGroup.position.set(userData.position.x, Math.max(0, userData.position.y), userData.position.z);
+                    avatarGroup.rotation.copy(userData.rotation);
+
+                    resolve(avatarGroup);
+                });
+            });
+        }
+
+        // Helper function to check if touch is on billboard
+        function isTouchOnBillboard(touchX, touchY) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((touchX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((touchY - rect.top) / rect.height) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            const billboardObjects = Object.values(billboardMeshes);
+            const intersects = raycaster.intersectObjects(billboardObjects);
+            return intersects.length > 0;
+        }
+        
+        function setupControls() {
+            const chatInput = document.getElementById('chatInput');
+            if (chatInput) {
+                chatInput.addEventListener('focus', () => { isTyping = true; });
+                chatInput.addEventListener('blur', () => { isTyping = false; });
+            }
+
+            document.addEventListener('keydown', (event) => {
+                if (isTyping) return;
+                switch (event.code) {
+                    case 'KeyW':
+                    case 'ArrowUp': moveForward = true; break;
+                    case 'KeyS':
+                    case 'ArrowDown': moveBackward = true; break;
+                    case 'KeyA':
+                    case 'ArrowLeft': moveLeft = true; break;
+                    case 'KeyD':
+                    case 'ArrowRight': moveRight = true; break;
+                }
+            });
+
+            document.addEventListener('keyup', (event) => {
+                if (isTyping) return;
+                switch (event.code) {
+                    case 'KeyW':
+                    case 'ArrowUp': moveForward = false; break;
+                    case 'KeyS':
+                    case 'ArrowDown': moveBackward = false; break;
+                    case 'KeyA':
+                    case 'ArrowLeft': moveLeft = false; break;
+                    case 'KeyD':
+                    case 'ArrowRight': moveRight = false; break;
+                }
+            });
+
+            let isMouseDown = false;
+            let mouseX = 0;
+            document.addEventListener('mousedown', (event) => {
+                if (event.target === renderer.domElement) {
+                    isMouseDown = true;
+                    mouseX = event.clientX;
+                }
+            });
+
+            document.addEventListener('mouseup', (event) => {
+                isMouseDown = false;
+                if (event.target === renderer.domElement) {
+                    handleBillboardClick(event);
+                }
+            });
+
+            document.addEventListener('mousemove', (event) => {
+                if (isMouseDown && myAvatar) {
+                    const deltaX = event.clientX - mouseX;
+                    myAvatar.rotation.y -= deltaX * 0.005;
+                    updateCameraPosition();
+                    mouseX = event.clientX;
+                }
+            });
+
+            // Touch rotation controls
+            document.addEventListener('touchstart', (event) => {
+                if (event.target === renderer.domElement && event.touches.length === 1) {
+                    const touch = event.touches[0];
+                    // Check if touch is not on a billboard
+                    if (!isTouchOnBillboard(touch.clientX, touch.clientY)) {
+                        isTouchRotating = true;
+                        touchX = touch.clientX;
+                        event.preventDefault(); // Prevent scrolling/zooming
+                    }
+                }
+            });
+
+            document.addEventListener('touchmove', (event) => {
+                if (isTouchRotating && myAvatar && event.touches.length === 1) {
+                    const touch = event.touches[0];
+                    const deltaX = touch.clientX - touchX;
+                    myAvatar.rotation.y -= deltaX * 0.005; // Same sensitivity as mouse
+                    updateCameraPosition();
+                    touchX = touch.clientX;
+                    event.preventDefault(); // Prevent scrolling
+                }
+            });
+
+            document.addEventListener('touchend', (event) => {
+                if (isTouchRotating) {
+                    isTouchRotating = false;
+                    // Check for billboard click on touchend
+                    if (event.changedTouches.length === 1) {
+                        const touch = event.changedTouches[0];
+                        if (isTouchOnBillboard(touch.clientX, touch.clientY)) {
+                            handleBillboardTouch(touch);
+                        }
+                    }
+                }
+            });
+
+            document.addEventListener('touchcancel', (event) => {
+                isTouchRotating = false;
+            });
+
+            document.getElementById('uploadButton').addEventListener('click', handleModalUpload);
+            document.getElementById('cancelUpload').addEventListener('click', closeUploadModal);
+
+            const chatToggle = document.getElementById('chatToggle');
+            if (chatToggle) chatToggle.addEventListener('click', toggleChatView);
+            const sendButton = document.getElementById('sendButton');
+            if (sendButton) sendButton.addEventListener('click', sendMessage);
+            if (chatInput) chatInput.addEventListener('keypress', (event) => {
+                if (event.key === 'Enter') sendMessage();
+            });
+
+            const dpadUp = document.getElementById('dpad-up');
+            const dpadDown = document.getElementById('dpad-down');
+            const dpadLeft = document.getElementById('dpad-left');
+            const dpadRight = document.getElementById('dpad-right');
+
+            const handleTouchStart = (e, direction) => { 
+                e.preventDefault();
+                switch (direction) {
+                    case 'up': moveForward = true; break;
+                    case 'down': moveBackward = true; break;
+                    case 'left': moveLeft = true; break;
+                    case 'right': moveRight = true; break;
+                }
+            };
+            const handleTouchEnd = (e, direction) => { 
+                e.preventDefault();
+                switch (direction) {
+                    case 'up': moveForward = false; break;
+                    case 'down': moveBackward = false; break;
+                    case 'left': moveLeft = false; break;
+                    case 'right': moveRight = false;
+                    break;
+                }
+            };
+
+            if (dpadUp) dpadUp.addEventListener('touchstart', (e) => handleTouchStart(e, 'up'));
+            if (dpadUp) dpadUp.addEventListener('touchend', (e) => handleTouchEnd(e, 'up'));
+            if (dpadDown) dpadDown.addEventListener('touchstart', (e) => handleTouchStart(e, 'down'));
+            if (dpadDown) dpadDown.addEventListener('touchend', (e) => handleTouchEnd(e, 'down'));
+            if (dpadLeft) dpadLeft.addEventListener('touchstart', (e) => handleTouchStart(e, 'left'));
+            if (dpadLeft) dpadLeft.addEventListener('touchend', (e) => handleTouchEnd(e, 'left'));
+            if (dpadRight) dpadRight.addEventListener('touchstart', (e) => handleTouchStart(e, 'right'));
+            if (dpadRight) dpadRight.addEventListener('touchend', (e) => handleTouchEnd(e, 'right'));
+        }
+
+        function updateMovement() {
+            if (!myAvatar) return;
+            const speed = 0.2;
+            const delta = clock.getDelta();
+
+            const forwardVector = new THREE.Vector3(0, 0, 1).applyQuaternion(myAvatar.quaternion);
+            const rightVector = new THREE.Vector3(-1, 0, 0).applyQuaternion(myAvatar.quaternion);
+
+            let newVelocity = new THREE.Vector3();
+            if (moveForward) newVelocity.add(forwardVector.multiplyScalar(speed));
+            if (moveBackward) newVelocity.add(forwardVector.multiplyScalar(-speed));
+            if (moveLeft) newVelocity.add(rightVector.multiplyScalar(-speed));
+            if (moveRight) newVelocity.add(rightVector.multiplyScalar(speed));
+
+            myAvatar.position.add(newVelocity);
+            myAvatar.position.y = Math.max(0, myAvatar.position.y);
+            updateCameraPosition();
+            
+            if (newVelocity.length() > 0 && socket && socket.connected) {
+                socket.emit('user-moved', {
+                    position: { x: myAvatar.position.x, y: myAvatar.position.y, z: myAvatar.position.z },
+                    rotation: { x: myAvatar.rotation.x, y: myAvatar.rotation.y, z: myAvatar.rotation.z }
+                });
+            }
+        }
+        
+        function updateCameraPosition() {
+            if (!myAvatar) return;
+            const avatarPosition = myAvatar.position.clone();
+            const avatarRotation = myAvatar.rotation.y;
+            const cameraDistance = 5;
+            const cameraHeight = 2;
+            const cameraX = avatarPosition.x - Math.sin(avatarRotation) * cameraDistance;
+            const cameraZ = avatarPosition.z - Math.cos(avatarRotation) * cameraDistance;
+            const cameraY = avatarPosition.y + cameraHeight;
+            camera.position.set(cameraX, cameraY, cameraZ);
+            const lookAtPoint = new THREE.Vector3(avatarPosition.x, avatarPosition.y + 1.5, avatarPosition.z);
+            camera.lookAt(lookAtPoint);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const deltaTime = clock.getDelta();
+            Object.values(avatarMixers).forEach(mixer => {
+                if (mixer) mixer.update(deltaTime);
+            });
+            updateMovement();
+            renderer.render(scene, camera);
+        }
+
+        function toggleChatView() {
+            const chatPanel = document.getElementById('chatPanel');
+            const chatToggle = document.getElementById('chatToggle');
+            const chatInputContainer = document.getElementById('chatInputContainer');
+            if (!chatPanel || !chatToggle || !chatInputContainer) return;
+
+            if (chatPanel.classList.contains('chat-expanded')) {
+                chatPanel.classList.remove('chat-expanded');
+                chatPanel.classList.add('chat-minimal');
+                chatToggle.textContent = 'Toggle Chat (Min)';
+            } else if (chatPanel.classList.contains('chat-minimal')) {
+                chatPanel.classList.remove('chat-minimal');
+                chatPanel.classList.add('chat-collapsed');
+                chatToggle.textContent = 'Toggle Chat (Closed)';
+            } else {
+                chatPanel.classList.remove('chat-collapsed');
+                chatPanel.classList.add('chat-expanded');
+                chatToggle.textContent = 'Toggle Chat (Full)';
+            }
+            
+            chatInputContainer.style.display = chatPanel.classList.contains('chat-collapsed') ? 'none' : 'flex';
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            if (message && socket && socket.connected) {
+                socket.emit('chat-message', { message: message });
+                input.value = '';
+            } else if (!socket || !socket.connected) {
+                alert('Not connected to server. Please refresh the page.');
+            }
+        }
+
+        function addChatMessage(messageData) {
+            const messagesDiv = document.getElementById('chatMessages');
+            const messageElement = document.createElement('p');
+            const time = new Date(messageData.timestamp).toLocaleTimeString();
+            if (messageData.type === 'system') {
+                messageElement.style.color = '#ffeb3b';
+                messageElement.style.fontStyle = 'italic';
+                messageElement.textContent = `[${time}] ${messageData.message}`;
+            } else {
+                messageElement.style.color = '#ffffff';
+                messageElement.innerHTML = `<strong>[${time}] ${messageData.username}:</strong> ${messageData.message}`;
+            }
+            messagesDiv.appendChild(messageElement);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function updateBillboard(billboardId, imageData) {
+    let texture = new THREE.TextureLoader().load(imageData);
+    
+    const billboardPairs = {
+        '1': '2',
+        '2': '1',
+        '3': '4',
+        '4': '3'
+    };
+
+    if (billboardMeshes[billboardId]) {
+        const pairId = billboardPairs[billboardId];
+        if (pairId && billboardMeshes[pairId]) {
+            billboardMeshes[billboardId].material.map = texture;
+            billboardMeshes[pairId].material.map = texture;
+            billboardMeshes[billboardId].material.needsUpdate = true;
+            billboardMeshes[pairId].material.needsUpdate = true;
+        }
+    }
+}
+
+        function handleBillboardClick(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            const billboardObjects = Object.values(billboardMeshes);
+            const intersects = raycaster.intersectObjects(billboardObjects);
+            if (intersects.length > 0) {
+                const clickedBillboard = intersects[0].object;
+                if (clickedBillboard.userData.billboardId) {
+                    openUploadModal(clickedBillboard.userData.billboardId);
+                }
+            }
+        }
+
+        function handleBillboardTouch(touch) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            const billboardObjects = Object.values(billboardMeshes);
+            const intersects = raycaster.intersectObjects(billboardObjects);
+            if (intersects.length > 0) {
+                const clickedBillboard = intersects[0].object;
+                if (clickedBillboard.userData.billboardId) {
+                    openUploadModal(clickedBillboard.userData.billboardId);
+                }
+            }
+        }
+
+        function openUploadModal(billboardId) {
+    currentBillboardId = billboardId;
+    
+    // Determine which pair this billboard belongs to
+    let pairName;
+    if (billboardId === '1' || billboardId === '2') {
+        pairName = 'Billboard 1';
+    } else if (billboardId === '3' || billboardId === '4') {
+        pairName = 'Billboard 2';
+    }
+    
+    document.getElementById('billboardTitle').textContent = `Upload Image to ${pairName}`;
+    document.getElementById('billboardUploadPanel').style.display = 'block';
+    document.getElementById('imageFile').value = '';
+}
+
+        function closeUploadModal() {
+            document.getElementById('billboardUploadPanel').style.display = 'none';
+            currentBillboardId = null;
+        }
+
+        function handleModalUpload() {
+            if (!currentBillboardId) return;
+            const fileInput = document.getElementById('imageFile');
+            const file = fileInput.files[0];
+            if (!file) {
+                alert('Please select a file first.');
+                return;
+            }
+            if (file.size > 2 * 1024 * 1024) {
+                alert('File size must be less than 2MB.');
+                return;
+            }
+            const formData = new FormData();
+            formData.append('image', file);
+            formData.append('billboardId', currentBillboardId);
+            const button = document.getElementById('uploadButton');
+            button.disabled = true;
+            button.textContent = 'Uploading...';
+            fetch('/upload-billboard', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    closeUploadModal();
+                } else {
+                    alert(data.error || 'Upload failed');
+                }
+            })
+            .catch(error => {
+                alert('Upload failed: ' + error.message);
+            })
+            .finally(() => {
+                button.disabled = false;
+                button.textContent = 'Upload';
+            });
+        }
+
+        function setupSocketHandlers() {
+            if (!socket) return;
+            socket.on('connect', () => {
+                myUserId = socket.id;
+                socket.emit('user-joined', {
+                    username: username,
+                    avatarType: selectedAvatar,
+                    position: { x: 0, y: 0, z: 0 },
+                    rotation: { x: 0, y: 0, z: 0 }
+                });
+            });
+            socket.on('disconnect', () => {
+                console.log('Disconnected from server');
+            });
+            socket.on('connect_error', (error) => {
+                console.error('Connection error:', error);
+                alert('Failed to connect to server');
+            });
+            socket.on('init-data', (data) => {
+                data.chatMessages.forEach(message => addChatMessage(message));
+                if (data.billboardImages['1']) updateBillboard('1', data.billboardImages['1']);
+                if (data.billboardImages['2']) updateBillboard('2', data.billboardImages['2']);
+                if (data.billboardImages['3']) updateBillboard('3', data.billboardImages['3']);
+                if (data.billboardImages['4']) updateBillboard('4', data.billboardImages['4']);
+            });
+
+            socket.on('user-list-updated', async (users) => {
+                console.log('User list updated event received. Processing...');
+                console.log('Server users data:', users); // LOGGING THE INCOMING DATA
+
+                // Create a list of all current users to check against
+                const currentUsers = new Set(Object.values(users).map(user => user.id));
+
+                // 1. Remove avatars for users who are no longer connected
+                Object.keys(avatars).forEach(userId => {
+                    if (!currentUsers.has(userId)) {
+                        scene.remove(avatars[userId]);
+                        if (avatarMixers[userId]) delete avatarMixers[userId];
+                        delete avatars[userId];
+                    }
+                });
+
+                // 2. Asynchronously create or update avatars for remaining users
+                for (const userData of Object.values(users)) {
+                    if (userData.id === myUserId) continue;
+
+                    const existingAvatar = avatars[userData.id];
+                    if (existingAvatar) {
+                        // Update existing avatar if necessary
+                        if (existingAvatar.userData.avatarType !== userData.avatarType) {
+                            console.log(`Avatar type changed for ${userData.username}, recreating avatar.`);
+                            // Remove old avatar
+                            scene.remove(existingAvatar);
+                            if (avatarMixers[userData.id]) delete avatarMixers[userData.id];
+                            delete avatars[userData.id];
+
+                            // Create new avatar and await its completion
+                            const newAvatar = await createAvatar(userData);
+                            if (newAvatar) {
+                                avatars[userData.id] = newAvatar;
+                                scene.add(newAvatar);
+                            }
+                        } else {
+                            // Avatar exists and type is the same, just update position and rotation
+                            existingAvatar.position.set(userData.position.x, Math.max(0, userData.position.y), userData.position.z);
+                            existingAvatar.rotation.copy(userData.rotation);
+                        }
+                    } else {
+                        // Create a new avatar
+                        const newAvatar = await createAvatar(userData);
+                        if (newAvatar) {
+                            avatars[userData.id] = newAvatar;
+                            scene.add(newAvatar);
+                        }
+                    }
+                }
+                
+                document.getElementById('playerCount').textContent = Object.keys(users).length;
+                console.log('User list processing complete.');
+            });
+            
+            socket.on('user-left', (userId) => {
+                if (avatars[userId]) {
+                    console.log(`Removing avatar for disconnected user: ${userId}`);
+                    scene.remove(avatars[userId]);
+                    if (avatarMixers[userId]) delete avatarMixers[userId];
+                    delete avatars[userId];
+                }
+            });
+
+            socket.on('user-moved', (data) => {
+                if (avatars[data.userId]) {
+                    avatars[data.userId].position.copy(data.position);
+                    avatars[data.userId].rotation.copy(data.rotation);
+                }
+            });
+            socket.on('chat-message', (data) => {
+                addChatMessage(data);
+            });
+            socket.on('billboard-updated', (data) => {
+                updateBillboard(data.billboardId, data.imageData);
+            });
+        }
+        
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
