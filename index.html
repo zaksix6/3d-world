@@ -3,7 +3,8 @@
   <head>
     <meta charset="utf-8">
     <title>My Free 3D Multi-User World</title>
-    <!-- Load A-Frame and Networked-Aframe frameworks -->
+    
+    <!-- Exact matching version stack for stable Networked-Aframe/EasyRTC rendering -->
     <script src="https://aframe.io"></script>
     <script src="https://cloudflare.com"></script>
     <script src="https://unpkg.com"></script>
@@ -22,7 +23,6 @@
       <a-assets>
         <template id="avatar-template">
           
-            <!-- Simple floating sphere head with primitive eyes -->
             <a-sphere class="head" color="#5F9EA0" radius="0.4">
               <a-sphere class="eye" color="#FFF" radius="0.1" position="0.15 0.1 -0.35"></a-sphere>
               <a-sphere class="eye" color="#FFF" radius="0.1" position="-0.15 0.1 -0.35"></a-sphere>
@@ -34,9 +34,7 @@
       <!-- The Environment / World Objects -->
       <a-sky color="#ECEFF1"></a-sky>
       <a-plane position="0 0 0" rotation="-90 0 0" width="30" height="30" color="#7BC8A4"></a-plane>
-      
-      <!-- Central landmark so users can orient themselves -->
-      <a-box position="0 1 -5" rotation="0 45 0" color="#4CC3D9" shadow></a-box>
+      <a-box position="0 1 -5" rotation="0 45 0" color="#4CC3D9"></a-box>
 
       <!-- User's Camera with Keyboard Movement Controls -->
       
@@ -44,11 +42,5 @@
 
     </a-scene>
 
-    <!-- Handle the Render 15-minute spin-down warning -->
-    <script>
-      document.querySelector('a-scene').addEventListener('adapter-error', function (evt) {
-        alert("The free multiplayer server is currently waking up. Please refresh the page in 45 seconds!");
-      });
-    </script>
   </body>
 </html>
