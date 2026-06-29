@@ -63,6 +63,16 @@ app.post('/upload-billboard', upload.single('image'), (req, res) => {
     }
 });
 
+// Reset endpoint - visit /reset to clear all session data
+app.get('/reset', (req, res) => {
+    Object.keys(users).forEach(k => delete users[k]);
+    chatMessages.length = 0;
+    Object.keys(billboardImages).forEach(k => billboardImages[k] = null);
+    io.emit('user-list-updated', users);
+    io.emit('init-data', { chatMessages: [], billboardImages });
+    res.send('World reset! All chat, billboards and users cleared.');
+});
+
 // Socket.io connection handling
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
