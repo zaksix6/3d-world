@@ -9,7 +9,6 @@
     <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.5.0/dist/aframe-extras.min.js"></script>
     
     <script src="https://unpkg.com/networked-aframe@^0.12.0/dist/networked-aframe.min.js"></script>
-    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
     <script src="https://unpkg.com/easyrtc@2.0.0/api/easyrtc.js"></script>
   </head>
@@ -25,7 +24,7 @@
       <a-assets>
         <template id="avatar-template">
           <a-entity class="avatar">
-            <a-sphere class="head" color="#5F9EA0" radius="0.4"></a-sphere>
+            <a-sphere color="#5F9EA0" radius="0.4"></a-sphere>
           </a-entity>
         </template>
       </a-assets>
@@ -34,15 +33,18 @@
       <a-plane position="0 0 0" rotation="-90 0 0" width="30" height="30" color="#7BC8A4"></a-plane>
       <a-box position="0 1 -5" rotation="0 45 0" color="#4CC3D9"></a-box>
 
-      <a-entity id="rig" movement-controls position="0 0 0">
+      <a-entity id="rig" 
+                movement-controls="fly: false; speed: 0.3" 
+                position="0 0 0">
         <a-entity id="player" 
                   camera 
                   position="0 1.6 0" 
-                  look-controls>
+                  look-controls="pointerLockEnabled: true">
         </a-entity>
       </a-entity>
       
     </a-scene>
 
   </body>
+</html>
 </html>
