@@ -25,10 +25,7 @@
       <a-assets>
         <template id="avatar-template">
           <a-entity class="avatar">
-            <a-sphere class="head" color="#5F9EA0" radius="0.4">
-              <a-sphere class="eye" color="#FFF" radius="0.1" position="0.15 0.1 -0.35"></a-sphere>
-              <a-sphere class="eye" color="#FFF" radius="0.1" position="-0.15 0.1 -0.35"></a-sphere>
-            </a-sphere>
+            <a-sphere class="head" color="#5F9EA0" radius="0.4"></a-sphere>
           </a-entity>
         </template>
       </a-assets>
@@ -37,11 +34,12 @@
       <a-plane position="0 0 0" rotation="-90 0 0" width="30" height="30" color="#7BC8A4"></a-plane>
       <a-box position="0 1 -5" rotation="0 45 0" color="#4CC3D9"></a-box>
 
-      <a-entity id="player"
-                camera 
-                wasd-controls 
-                look-controls 
-                position="0 1.6 0">
+      <a-entity id="rig" movement-controls position="0 0 0">
+        <a-entity id="player" 
+                  camera 
+                  position="0 1.6 0" 
+                  look-controls>
+        </a-entity>
       </a-entity>
       
     </a-scene>
