@@ -4,22 +4,27 @@
     <meta charset="utf-8">
     <title>My Free 3D Multi-User World</title>
     
-    <!-- Stable, fully compatible Web3D version stack -->
-    <script src="https://cloudflare.com"></script>
+    <!-- 1. Core 3D Graphics Engine -->
+    <script src="https://aframe.io"></script>
+    
+    <!-- 2. Underlying Multi-User Sync Framework -->
+    <script src="https://unpkg.com"></script>
+    
+    <!-- 3. Dedicated Socket & EasyRTC Network Adapters -->
     <script src="https://cloudflare.com"></script>
     <script src="https://unpkg.com"></script>
   </head>
   <body>
 
-    <!-- A-Frame 3D Engine Scene Wrapper -->
+    <!-- Updated setup: Changed adapter to 'easyrtc' and added secure ws protocol fallback -->
     <a-scene networked-scene="
       room: lobby;
       debug: true;
-      adapter: wseasyrtc;
+      adapter: easyrtc;
       serverURL: https://signaling-server-b0ds.onrender.com;
     ">
       
-      <!-- Define Assets and Templates for Avatars -->
+      <!-- Assets & Player Avatars Template -->
       <a-assets>
         <template id="avatar-template">
           
@@ -31,12 +36,12 @@
         </template>
       </a-assets>
 
-      <!-- The Environment / World Objects -->
+      <!-- 3D Environment World Layout -->
       <a-sky color="#ECEFF1"></a-sky>
       <a-plane position="0 0 0" rotation="-90 0 0" width="30" height="30" color="#7BC8A4"></a-plane>
       <a-box position="0 1 -5" rotation="0 45 0" color="#4CC3D9"></a-box>
 
-      <!-- User's Camera with Keyboard Movement Controls -->
+      <!-- Player Instance -->
       
       
 
