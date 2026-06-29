@@ -8,8 +8,13 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Serve static files from the current directory
+// Serve static files from the public directory
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Serve index.html at root
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 // In-memory storage for game state
 const users = {};
@@ -21,7 +26,7 @@ const MAX_CHAT_MESSAGES = 50;
 const storage = multer.memoryStorage();
 const upload = multer({
     storage: storage,
-    limits: { fileSize: 2 * 1024 * 1024 }, // 2MB limit
+    limits: { fileSize: 2 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         if (file.mimetype.startsWith('image/')) {
             cb(null, true);
@@ -42,15 +47,12 @@ app.post('/upload-billboard', upload.single('image'), (req, res) => {
             return res.json({ success: false, error: 'Invalid billboard ID' });
         }
 
-        // Convert to base64 data URL
         const imageData = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
 
-        // Store it (paired billboards share the same image)
         const pairs = { '1': '2', '2': '1', '3': '4', '4': '3' };
         billboardImages[billboardId] = imageData;
         billboardImages[pairs[billboardId]] = imageData;
 
-        // Broadcast to all clients
         io.emit('billboard-updated', { billboardId: billboardId, imageData: imageData });
         io.emit('billboard-updated', { billboardId: pairs[billboardId], imageData: imageData });
 
@@ -66,7 +68,6 @@ io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
 
     socket.on('user-joined', (data) => {
-        // Register the user
         users[socket.id] = {
             id: socket.id,
             username: data.username || 'Unknown',
@@ -77,13 +78,11 @@ io.on('connection', (socket) => {
 
         console.log(`${data.username} joined with avatar ${data.avatarType}`);
 
-        // Send existing state to the new user
         socket.emit('init-data', {
             chatMessages: chatMessages,
             billboardImages: billboardImages
         });
 
-        // Add a system message
         const joinMessage = {
             type: 'system',
             message: `${data.username} joined the world`,
@@ -93,7 +92,6 @@ io.on('connection', (socket) => {
         if (chatMessages.length > MAX_CHAT_MESSAGES) chatMessages.shift();
         io.emit('chat-message', joinMessage);
 
-        // Broadcast updated user list to everyone
         io.emit('user-list-updated', users);
     });
 
@@ -101,7 +99,6 @@ io.on('connection', (socket) => {
         if (users[socket.id]) {
             users[socket.id].position = data.position;
             users[socket.id].rotation = data.rotation;
-            // Broadcast movement to everyone except sender
             socket.broadcast.emit('user-moved', {
                 userId: socket.id,
                 position: data.position,
