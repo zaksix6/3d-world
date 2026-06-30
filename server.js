@@ -71,6 +71,10 @@ app.post('/upload-billboard', upload.single('image'), (req, res) => {
     }
 });
 
+app.get('/version-check', (req, res) => {
+    res.send('VERSION MARKER: pond-y3-test-12345');
+});
+
 // Reset endpoint - visit /reset to clear all session data
 app.get('/reset', (req, res) => {
     Object.keys(users).forEach(k => delete users[k]);
