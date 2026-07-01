@@ -393,6 +393,7 @@
         }
 
         function loadGLBAvatar(avatarType, callback) {
+            console.log('DEBUG loadGLBAvatar called with avatarType:', JSON.stringify(avatarType));
             if (!gltfLoader) { callback(null); return; }
             if (!avatarType || !avatarConfigs[avatarType]) { callback(null); return; }
             const config = avatarConfigs[avatarType];
