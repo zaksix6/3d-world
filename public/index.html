@@ -164,7 +164,7 @@
 
         const avatarConfigs = {
             'selena2': { scale: 1.0, yOffset: 1.2, rotationOffset: Math.PI },
-            'astronaut2': { scale: 1.0, yOffset: 1.0, rotationOffset: Math.PI },
+            'astronaut2': { scale: 1.0, yOffset: 1.2, rotationOffset: Math.PI * 2.5 },
             'martin2': { scale: 1.0, yOffset: 1.2, rotationOffset: Math.PI },
             'cub': { scale: 1.0, yOffset: 1, rotationOffset: Math.PI }
         };
@@ -393,7 +393,6 @@
         }
 
         function loadGLBAvatar(avatarType, callback) {
-            console.log('DEBUG loadGLBAvatar called with avatarType:', JSON.stringify(avatarType));
             if (!gltfLoader) { callback(null); return; }
             if (!avatarType || !avatarConfigs[avatarType]) { callback(null); return; }
             const config = avatarConfigs[avatarType];
@@ -755,7 +754,7 @@
                 });
             });
             socket.on('disconnect', () => console.log('Disconnected'));
-            socket.on('connect_error', () => alert('Failed to connect to server'));
+            socket.on('connect_error', () => console.warn('Could not connect to multiplayer server (this is expected during local/offline testing).'));
             socket.on('init-data', (data) => {
                 data.chatMessages.forEach(m => addChatMessage(m));
                 ['1','2','3','4'].forEach(id => { if (data.billboardImages[id]) updateBillboard(id, data.billboardImages[id]); });
